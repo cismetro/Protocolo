@@ -492,16 +492,18 @@
             }
         }
 
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = 200; // Fixed height
+		 function resizeCanvas() {
+			const container = canvas.parentElement;
+			canvas.width = container.clientWidth;
+			canvas.height = 200; // Fixed height
 
-            // Set initial styles
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = document.documentElement.classList.contains('dark') ? 'white' : '#000000';
-        }
+			// Set initial styles
+			ctx.lineWidth = 3;
+			ctx.lineCap = 'round';
+			
+			// SEMPRE usar preto (independentemente do modo claro/escuro)
+			ctx.strokeStyle = '#000000';
+		}
 
         // Generate Protocol
         function generateProtocol() {
@@ -644,6 +646,100 @@
 				return;
 			}
 			
+			try {
+				// NOVO: Preparar para capturar com fundo branco
+				const tempCanvas = document.createElement('canvas');
+				tempCanvas.width = canvas.width;
+				tempCanvas.height = canvas.height;
+				const tempCtx = tempCanvas.getContext('2d');
+				
+				// Desenhar fundo branco
+				tempCtx.fillStyle = '#FFFFFF';
+				tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+				
+				// Copiar o conteúdo do canvas original
+				tempCtx.drawImage(canvas, 0, 0);
+				
+				// Capturar a imagem do canvas temporário (com fundo branco)
+				const dataURL = tempCanvas.toDataURL('image/png');
+				
+				console.log("Assinatura capturada:", dataURL.substring(0, 50) + "...");
+				
+				// Armazenar a assinatura no estado e localStorage
+				if (appState.protocolos[codigo]) {
+					appState.protocolos[codigo].assinatura = dataURL;
+					if (appState.currentProtocol === codigo) {
+						updateAssinaturaPreview(dataURL);
+					}
+				} else {
+					appState.protocolos[codigo] = {
+						created: new Date(),
+						assinatura: dataURL
+					};
+				}
+				
+				// Armazenar localmente
+				localStorage.setItem(`signature_${codigo}`, dataURL);
+				
+				// Atualizar o protocolo no localStorage
+				const storedProtocolo = localStorage.getItem(`protocolo_${codigo}`);
+				if (storedProtocolo) {
+					const protocolo = JSON.parse(storedProtocolo);
+					protocolo.assinatura = dataURL;
+					localStorage.setItem(`protocolo_${codigo}`, JSON.stringify(protocolo));
+				} else {
+					localStorage.setItem(`protocolo_${codigo}`, JSON.stringify({
+						created: new Date().toISOString(),
+						assinatura: dataURL
+					}));
+				}
+				
+				// Processos adicionais...
+				try {
+					if (window.parent && window.parent !== window) {
+						window.parent.postMessage({
+							action: 'signatureCreated',
+							codigo: codigo,
+							assinatura: dataURL
+						}, '*');
+						
+						if (typeof window.parent.receiveSignatureData === 'function') {
+							window.parent.receiveSignatureData({
+								action: 'signatureCreated',
+								codigo: codigo,
+								assinatura: dataURL
+							});
+						}
+					}
+				} catch (e) {
+					console.log('Erro ao enviar assinatura para o formulário principal:', e);
+				}
+				
+				showAlert('Assinatura enviada com sucesso!');
+				
+				// Mostrar o modal de transferência
+				showTransferModal(codigo, dataURL);
+			} catch (e) {
+				console.error('Erro ao capturar assinatura:', e);
+				showAlert('Erro ao processar a assinatura. Tente novamente.', 'error');
+			}
+		}
+/*
+		
+		function submitSignature() {
+			const codigo = codigoInput.value.trim();
+			
+			if (!codigo) {
+				showAlert('Por favor, digite o código do protocolo.', 'error');
+				return;
+			}
+			
+			// Verificar se o canvas está vazio
+			if (isCanvasEmpty()) {
+				showAlert('Por favor, faça sua assinatura antes de enviar.', 'error');
+				return;
+			}
+			
 			// Configurar o canvas para fundo branco antes de capturar a assinatura
 			const canvasWidth = canvas.width;
 			const canvasHeight = canvas.height;
@@ -714,114 +810,9 @@
 			// Mostrar o modal de transferência
 			showTransferModal(codigo, dataURL);
 		}
-		
-		
-		
-/*
-        function submitSignature() {
-            const codigo = codigoInput.value.trim();
-            
-            if (!codigo) {
-                showAlert('Por favor, digite o código do protocolo.', 'error');
-                return;
-            }
-            
-            // Verificar se o canvas está vazio
-            if (isCanvasEmpty()) {
-                showAlert('Por favor, faça sua assinatura antes de enviar.', 'error');
-                return;
-            }
-            
-            // Get signature as data URL
-            const dataURL = canvas.toDataURL('image/png');
-            
-            // Check if protocol exists in our in-memory storage
-            if (appState.protocolos[codigo]) {
-                // Store the signature
-                appState.protocolos[codigo].assinatura = dataURL;
-                
-                // If this is the currently viewed protocol in the gerar view, update its preview
-                if (appState.currentProtocol === codigo) {
-                    updateAssinaturaPreview(dataURL);
-                }
-            } else {
-                // Create the protocol if it doesn't exist yet
-                appState.protocolos[codigo] = {
-                    created: new Date(),
-                    assinatura: dataURL
-                };
-            }
-            
-            // Armazenar localmente para persistência
-            try {
-                localStorage.setItem(`signature_${codigo}`, dataURL);
-                
-                // Atualizar o protocolo no localStorage
-                const storedProtocolo = localStorage.getItem(`protocolo_${codigo}`);
-                if (storedProtocolo) {
-                    const protocolo = JSON.parse(storedProtocolo);
-                    protocolo.assinatura = dataURL;
-                    localStorage.setItem(`protocolo_${codigo}`, JSON.stringify(protocolo));
-                } else {
-                    localStorage.setItem(`protocolo_${codigo}`, JSON.stringify({
-                        created: new Date().toISOString(),
-                        assinatura: dataURL
-                    }));
-                }
-            } catch (e) {
-                console.log('Erro ao armazenar no localStorage:', e);
-            }
-            
-            // Enviar para o formulário pai se estivermos em um iframe
-            try {
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({
-                        action: 'signatureCreated',
-                        codigo: codigo,
-                        assinatura: dataURL
-                    }, '*');
-                    
-                    // Tentar o método alternativo
-                    if (typeof window.parent.receiveSignatureData === 'function') {
-                        window.parent.receiveSignatureData({
-                            action: 'signatureCreated',
-                            codigo: codigo,
-                            assinatura: dataURL
-                        });
-                    }
-                }
-            } catch (e) {
-                console.log('Erro ao enviar assinatura para o formulário principal:', e);
-            }
-            
-            showAlert('Assinatura enviada com sucesso!');
-            
-            // Mostrar o modal de transferência
-            showTransferModal(codigo, dataURL);
-        }
 */
-        /*function updateAssinaturaPreview(dataURL) {
-            assinaturaPreview.innerHTML = '';
-            const img = document.createElement('img');
-            img.src = dataURL;
-            img.className = 'max-w-full';
-            assinaturaPreview.appendChild(img);
-        }*/
 		
-		/*
-		function updateAssinaturaPreview(dataURL) {
-		assinaturaPreview.innerHTML = '';
-		const img = document.createElement('img');
-		img.src = dataURL;
-		img.className = 'max-w-full';
-		
-		// Adicionar borda e fundo para garantir contraste
-		img.style.backgroundColor = '#ffffff';
-		img.style.border = '1px solid #ccc';
-		img.style.padding = '8px';
-		
-		assinaturaPreview.appendChild(img);
-	}*/
+/*		
 			
 		function updateAssinaturaPreview(dataURL) {
     // Limpar o container atual
@@ -868,8 +859,50 @@
     container.appendChild(img);
     assinaturaPreview.appendChild(container);
 }	
-			
-		
+*/			
+	function updateAssinaturaPreview(dataURL) {
+    // Limpar o container atual
+    assinaturaPreview.innerHTML = '';
+    
+    // Verificar se a assinatura é válida
+    if (!dataURL || dataURL === 'null' || dataURL === 'undefined') {
+        assinaturaPreview.innerHTML = '<p class="text-secondary dark:text-grayColor">Nenhuma assinatura válida encontrada</p>';
+        return;
+    }
+    
+    // Criar um container com fundo branco para garantir visibilidade
+    const container = document.createElement('div');
+    container.className = 'signature-container';
+    container.style.backgroundColor = '#ffffff';
+    container.style.border = '1px solid #ddd';
+    container.style.borderRadius = '4px';
+    container.style.padding = '10px';
+    container.style.display = 'inline-block';
+    container.style.width = '100%';
+    
+    // Adicionar a imagem da assinatura
+    const img = document.createElement('img');
+    img.src = dataURL;
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '150px';
+    img.style.display = 'block';
+    img.style.margin = '0 auto';
+
+    // Tratamento de erros para a imagem
+    img.onerror = function() {
+        container.innerHTML = `
+            <div style="color: #e81d51; padding: 20px; text-align: center;">
+                <p>Erro ao carregar assinatura.</p>
+                <small>Tente assinar novamente.</small>
+            </div>
+        `;
+        console.error("Erro ao carregar imagem da assinatura");
+    };
+    
+    // Montar a estrutura
+    container.appendChild(img);
+    assinaturaPreview.appendChild(container);
+}	
 		
 		
         
@@ -925,7 +958,7 @@
                 Verificar assinatura
             `;
         }
-        
+ /*
         // Função showTransferModal completamente reescrita
         function showTransferModal(codigo, assinatura) {
             try {
@@ -1147,7 +1180,204 @@
                 transferModal.classList.add('show');
             }
         }
-        
+ */
+ function showTransferModal(codigo, assinatura) {
+    try {
+        // VERIFICAÇÃO DE ASSINATURA VÁLIDA
+        if (!assinatura || typeof assinatura !== 'string' || assinatura.trim() === '') {
+            alert("Assinatura inválida. Não é possível gerar a transferência.");
+            return;
+        }
+
+        console.log("Iniciando modal de transferência");
+
+        // 1. Armazenar a assinatura original com ID curto
+        const idAssinatura = gerarIdCurto();
+        window.assinaturaCache[idAssinatura] = assinatura;
+        sessionStorage.setItem(`signature_${idAssinatura}`, assinatura);
+
+        // 2. Criar dois códigos - um completo para o QR code e um curto para exibição/cópia
+        const timestamp = Date.now();
+        const fullTransferCode = `${codigo}|${timestamp}|${encodeURIComponent(assinatura)}`;
+        const shortTransferCode = `${codigo}|${timestamp}|${idAssinatura}`;
+
+        // Armazenar o código completo para referência
+        currentTransferCode = fullTransferCode;
+
+        // 3. Limpar o container atual
+        transferQRCode.innerHTML = '';
+
+        // 4. Criar o HTML com fundo escuro para melhor visualização
+        const html = `
+            <div style="margin-bottom: 20px; text-align: center;">
+                <div id="qr-container" style="background: #222; padding: 15px; border-radius: 8px; display: flex; justify-content: center; margin-bottom: 15px;"></div>
+                
+                <div style="margin-top: 15px; border: 1px solid #555; padding: 10px; border-radius: 5px; background-color: #333; text-align: left; color: white;">
+                    <p style="font-weight: bold; margin-bottom: 5px; font-size: 14px; color: white;">Código de transferência:</p>
+                    <div style="word-break: break-all; font-size: 12px; margin-bottom: 10px; font-family: monospace; color: white; background-color: #222; padding: 8px; border-radius: 4px;">${shortTransferCode}</div>
+                    <button id="copy-btn" style="background-color: #4fc9c4; color: white; border: none; border-radius: 5px; padding: 8px 12px; font-size: 14px; cursor: pointer; width: 100%;">Copiar código</button>
+                </div>
+                
+                <div style="margin-top: 10px; font-size: 12px; color: #ccc;">
+                    <p>1. Copie o código clicando no botão acima</p>
+                    <p>2. No outro dispositivo, clique em "Verificar assinatura"</p>
+                    <p>3. Cole o código e clique em "Importar"</p>
+                </div>
+                
+                <p style="margin-top: 15px; font-size: 12px; color: white;">Este código é válido por 5 minutos.</p>
+            </div>
+        `;
+
+        // 5. Adicionar o HTML ao container
+        transferQRCode.innerHTML = html;
+
+        // 6. Gerar o QR code
+        const qrContainer = document.getElementById('qr-container');
+        if (qrContainer) {
+            try {
+                new QRCode(qrContainer, {
+                    text: shortTransferCode,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#FFFFFF",
+                    colorLight: "#222222",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                console.log("QR code gerado com método 1");
+            } catch (qrError) {
+                console.error('Erro ao gerar QR code com método 1:', qrError);
+                try {
+                    qrContainer.innerHTML = '';
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 200;
+                    canvas.height = 200;
+                    qrContainer.appendChild(canvas);
+
+                    QRCode.toCanvas(canvas, shortTransferCode, {
+                        width: 200,
+                        margin: 2,
+                        color: {
+                            dark: '#FFFFFF',
+                            light: '#222222'
+                        }
+                    }, function(error) {
+                        if (error) throw error;
+                        console.log("QR code gerado com método 2");
+                    });
+                } catch (secondError) {
+                    console.error('Erro ao gerar QR code com método 2:', secondError);
+                    try {
+                        qrContainer.innerHTML = '';
+                        QRCode.toDataURL(shortTransferCode, {
+                            width: 200,
+                            margin: 2,
+                            color: {
+                                dark: '#FFFFFF',
+                                light: '#222222'
+                            }
+                        }, function(err, url) {
+                            if (err) throw err;
+                            const img = document.createElement('img');
+                            img.src = url;
+                            img.width = 200;
+                            img.height = 200;
+                            qrContainer.appendChild(img);
+                            console.log("QR code gerado com método 3");
+                        });
+                    } catch (thirdError) {
+                        console.error('Erro ao gerar QR code com método 3:', thirdError);
+                        qrContainer.innerHTML = `
+                            <div style="background: #222; padding: 20px; color: white; text-align: center; border-radius: 8px;">
+                                <p style="color: #ff6b6b; font-size: 14px;">Não foi possível gerar o QR code.</p>
+                                <p style="margin-top: 10px;">Por favor, use o código texto acima.</p>
+                            </div>
+                        `;
+                    }
+                }
+            }
+        }
+
+        // 7. Evento de cópia
+        const copyBtn = document.getElementById('copy-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function() {
+                try {
+                    const tempInput = document.createElement('textarea');
+                    tempInput.value = fullTransferCode;
+                    tempInput.style.position = 'fixed';
+                    tempInput.style.opacity = 0;
+                    document.body.appendChild(tempInput);
+                    tempInput.focus();
+                    tempInput.select();
+
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        copyBtn.textContent = '✓ Copiado!';
+                        copyBtn.style.backgroundColor = '#79b24a';
+                        setTimeout(() => {
+                            copyBtn.textContent = 'Copiar código';
+                            copyBtn.style.backgroundColor = '#4fc9c4';
+                        }, 2000);
+                    } else {
+                        navigator.clipboard.writeText(fullTransferCode).then(() => {
+                            copyBtn.textContent = '✓ Copiado!';
+                            copyBtn.style.backgroundColor = '#79b24a';
+                            setTimeout(() => {
+                                copyBtn.textContent = 'Copiar código';
+                                copyBtn.style.backgroundColor = '#4fc9c4';
+                            }, 2000);
+                        }).catch(err => { throw err; });
+                    }
+
+                    document.body.removeChild(tempInput);
+                } catch (e) {
+                    console.error('Erro ao copiar:', e);
+                    copyBtn.textContent = 'Erro ao copiar';
+                    copyBtn.style.backgroundColor = '#e81d51';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'Copiar código';
+                        copyBtn.style.backgroundColor = '#4fc9c4';
+                    }, 2000);
+                    alert("Copie este código:\n\n" + fullTransferCode);
+                }
+            });
+        }
+
+        // 8. Mostrar o modal
+        transferModal.classList.add('show');
+        console.log("Modal exibido com sucesso");
+
+    } catch (error) {
+        console.error("Erro na função showTransferModal:", error);
+        transferQRCode.innerHTML = `
+            <div style="text-align: center; color: white;">
+                <p style="font-weight: bold; color: white;">Código de transferência:</p>
+                <div style="background-color: #222; padding: 10px; border-radius: 5px; margin: 10px 0; word-break: break-all; font-size: 14px; color: white;">
+                    ${codigo}|${Date.now()}|${gerarIdCurto()}
+                </div>
+                <button id="emergency-copy" style="background-color: #4fc9c4; color: white; border: none; border-radius: 5px; padding: 8px 16px; margin-top: 10px; cursor: pointer;">
+                    Copiar código de emergência
+                </button>
+                <p style="color: #ff6b6b; font-size: 12px; margin-top: 10px;">Ocorreu um erro. Use o código acima.</p>
+            </div>
+        `;
+        setTimeout(() => {
+            const emergencyBtn = document.getElementById('emergency-copy');
+            if (emergencyBtn) {
+                emergencyBtn.addEventListener('click', function() {
+                    const code = `${codigo}|${Date.now()}|${gerarIdCurto()}`;
+                    navigator.clipboard.writeText(code).catch(() => {
+                        alert("Copie este código:\n\n" + code);
+                    });
+                    this.textContent = "Copiado!";
+                });
+            }
+        }, 500);
+    }
+}
+
+ 
         // Função importSignature atualizada para processar o código curto
         function importSignature() {
             const transferCode = importCodeInput.value.trim();
