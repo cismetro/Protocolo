@@ -786,7 +786,7 @@
                 // 2. Criar dois códigos - um completo para o QR code e um curto para exibição/cópia
                 const timestamp = Date.now();
                 const fullTransferCode = `${codigo}|${timestamp}|${encodeURIComponent(assinatura)}`;
-                const shortTransferCode = `${codigo}|${timestamp}|${idAssinatura}`;
+                const fullTransferCode = `${codigo}|${timestamp}|${idAssinatura}`;
                 
                 // Armazenar o código completo para referência
                 currentTransferCode = fullTransferCode;
@@ -801,7 +801,7 @@
                         
                         <div style="margin-top: 15px; border: 1px solid #555; padding: 10px; border-radius: 5px; background-color: #333; text-align: left; color: white;">
                             <p style="font-weight: bold; margin-bottom: 5px; font-size: 14px; color: white;">Código de transferência:</p>
-                            <div style="word-break: break-all; font-size: 12px; margin-bottom: 10px; font-family: monospace; color: white; background-color: #222; padding: 8px; border-radius: 4px;">${shortTransferCode}</div>
+                            <div style="word-break: break-all; font-size: 12px; margin-bottom: 10px; font-family: monospace; color: white; background-color: #222; padding: 8px; border-radius: 4px;">${fullTransferCode}</div>
                             <button id="copy-btn" style="background-color: #4fc9c4; color: white; border: none; border-radius: 5px; padding: 8px 12px; font-size: 14px; cursor: pointer; width: 100%;">Copiar código</button>
                         </div>
                         
@@ -824,7 +824,7 @@
                     try {
                         // Método 1: Usar construtor direto da biblioteca
                         new QRCode(qrContainer, {
-                            text: shortTransferCode, // Usar código curto para QR code
+                            text: fullTransferCode, // Usar código curto para QR code
                             width: 200,
                             height: 200,
                             colorDark: "#FFFFFF",  // Código branco
@@ -848,7 +848,7 @@
                             qrContainer.appendChild(canvas);
                             
                             // Gerar QR code com o código curto
-                            QRCode.toCanvas(canvas, shortTransferCode, { 
+                            QRCode.toCanvas(canvas, fullTransferCode, { 
                                 width: 200, 
                                 margin: 2,
                                 color: {
@@ -867,7 +867,7 @@
                             // Método 3: Usar URL
                             try {
                                 qrContainer.innerHTML = '';
-                                QRCode.toDataURL(shortTransferCode, { 
+                                QRCode.toDataURL(fullTransferCode, { 
                                     width: 200,
                                     margin: 2,
                                     color: {
@@ -904,7 +904,7 @@
                         try {
                             // Criar elemento temporário para cópia
                             const tempInput = document.createElement('textarea');
-                            tempInput.value = shortTransferCode; // Usar o código CURTO
+                            tempInput.value = fullTransferCode; // Usar o código CURTO
                             tempInput.style.position = 'fixed';
                             tempInput.style.opacity = 0;
                             document.body.appendChild(tempInput);
@@ -923,7 +923,7 @@
                                 }, 2000);
                             } else {
                                 // Se falhou, tenta com clipboard API
-                                navigator.clipboard.writeText(shortTransferCode)
+                                navigator.clipboard.writeText(fullTransferCode)
                                     .then(() => {
                                         copyBtn.textContent = '✓ Copiado!';
                                         copyBtn.style.backgroundColor = '#79b24a';
@@ -950,7 +950,7 @@
                             }, 2000);
                             
                             // Último recurso - alertar o código
-                            alert("Copie este código:\n\n" + shortTransferCode);
+                            alert("Copie este código:\n\n" + fullTransferCode);
                         }
                     });
                 }
