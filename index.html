@@ -629,7 +629,95 @@
         function clearSignature() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-
+		
+		function submitSignature() {
+			const codigo = codigoInput.value.trim();
+			
+			if (!codigo) {
+				showAlert('Por favor, digite o código do protocolo.', 'error');
+				return;
+			}
+			
+			// Verificar se o canvas está vazio
+			if (isCanvasEmpty()) {
+				showAlert('Por favor, faça sua assinatura antes de enviar.', 'error');
+				return;
+			}
+			
+			// Configurar o canvas para fundo branco antes de capturar a assinatura
+			const canvasWidth = canvas.width;
+			const canvasHeight = canvas.height;
+			const tempContext = canvas.getContext('2d');
+			
+			// Salvar o que foi desenhado
+			const signatureData = tempContext.getImageData(0, 0, canvasWidth, canvasHeight);
+			
+			// Criar fundo branco
+			tempContext.fillStyle = '#FFFFFF';
+			tempContext.fillRect(0, 0, canvasWidth, canvasHeight);
+			
+			// Restaurar o que foi desenhado (agora sobre fundo branco)
+			tempContext.putImageData(signatureData, 0, 0);
+			
+			// Get signature as data URL (agora com fundo branco)
+			const dataURL = canvas.toDataURL('image/png');
+			
+			console.log("Assinatura gerada:", dataURL.substring(0, 100) + "...");
+			
+			// Restaurar o canvas para transparente (se necessário)
+			tempContext.clearRect(0, 0, canvasWidth, canvasHeight);
+			tempContext.putImageData(signatureData, 0, 0);
+			
+			// Resto da função permanece igual...
+			
+			// Check if protocol exists in our in-memory storage
+			if (appState.protocolos[codigo]) {
+				// Store the signature
+				appState.protocolos[codigo].assinatura = dataURL;
+				
+				// If this is the currently viewed protocol in the gerar view, update its preview
+				if (appState.currentProtocol === codigo) {
+					updateAssinaturaPreview(dataURL);
+				}
+			} else {
+				// Create the protocol if it doesn't exist yet
+				appState.protocolos[codigo] = {
+					created: new Date(),
+					assinatura: dataURL
+				};
+			}
+			
+			// Armazenar localmente para persistência
+			try {
+				localStorage.setItem(`signature_${codigo}`, dataURL);
+				
+				// Atualizar o protocolo no localStorage
+				const storedProtocolo = localStorage.getItem(`protocolo_${codigo}`);
+				if (storedProtocolo) {
+					const protocolo = JSON.parse(storedProtocolo);
+					protocolo.assinatura = dataURL;
+					localStorage.setItem(`protocolo_${codigo}`, JSON.stringify(protocolo));
+				} else {
+					localStorage.setItem(`protocolo_${codigo}`, JSON.stringify({
+						created: new Date().toISOString(),
+						assinatura: dataURL
+					}));
+				}
+			} catch (e) {
+				console.log('Erro ao armazenar no localStorage:', e);
+			}
+			
+			// Resto do código permanece igual...
+			
+			showAlert('Assinatura enviada com sucesso!');
+			
+			// Mostrar o modal de transferência
+			showTransferModal(codigo, dataURL);
+		}
+		
+		
+		
+/*
         function submitSignature() {
             const codigo = codigoInput.value.trim();
             
@@ -711,7 +799,7 @@
             // Mostrar o modal de transferência
             showTransferModal(codigo, dataURL);
         }
-
+*/
         /*function updateAssinaturaPreview(dataURL) {
             assinaturaPreview.innerHTML = '';
             const img = document.createElement('img');
@@ -720,6 +808,7 @@
             assinaturaPreview.appendChild(img);
         }*/
 		
+		/*
 		function updateAssinaturaPreview(dataURL) {
 		assinaturaPreview.innerHTML = '';
 		const img = document.createElement('img');
@@ -732,7 +821,53 @@
 		img.style.padding = '8px';
 		
 		assinaturaPreview.appendChild(img);
-	}
+	}*/
+			
+		function updateAssinaturaPreview(dataURL) {
+    // Limpar o container atual
+    assinaturaPreview.innerHTML = '';
+    
+    // Verificar se a assinatura é válida
+    if (!dataURL || dataURL === 'null' || dataURL === 'undefined') {
+        assinaturaPreview.innerHTML = '<p class="text-secondary dark:text-grayColor">Nenhuma assinatura válida encontrada</p>';
+        return;
+    }
+    
+    // Criar um container com fundo branco para garantir contraste
+    const container = document.createElement('div');
+    container.style.backgroundColor = '#ffffff';
+    container.style.border = '1px solid #ccc';
+    container.style.padding = '10px';
+    container.style.borderRadius = '5px';
+    container.style.width = '100%';
+    container.style.textAlign = 'center';
+    
+    // Adicionar a imagem da assinatura
+    const img = document.createElement('img');
+    img.src = dataURL;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.margin = '0 auto';
+    
+    // Adicionar mensagem de log para depuração
+    console.log("Dados da assinatura:", dataURL.substring(0, 100) + "...");
+    
+    // Adicionar tratamento de erro para a imagem
+    img.onerror = function() {
+        container.innerHTML = '<p style="color: red;">Erro ao carregar a assinatura. Por favor, assine novamente.</p>';
+        console.error("Erro ao carregar imagem da assinatura");
+    };
+    
+    // Adicionar mensagem de sucesso quando a imagem carregar
+    img.onload = function() {
+        console.log("Imagem da assinatura carregada com sucesso!");
+    };
+    
+    // Montar a estrutura
+    container.appendChild(img);
+    assinaturaPreview.appendChild(container);
+}	
 			
 		
 		
