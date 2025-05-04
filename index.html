@@ -500,7 +500,7 @@
             // Set initial styles
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
-            ctx.strokeStyle = document.documentElement.classList.contains('dark') ? 'white' : '#3f485d';
+            ctx.strokeStyle = document.documentElement.classList.contains('dark') ? 'white' : '#000000';
         }
 
         // Generate Protocol
@@ -712,13 +712,31 @@
             showTransferModal(codigo, dataURL);
         }
 
-        function updateAssinaturaPreview(dataURL) {
+        /*function updateAssinaturaPreview(dataURL) {
             assinaturaPreview.innerHTML = '';
             const img = document.createElement('img');
             img.src = dataURL;
             img.className = 'max-w-full';
             assinaturaPreview.appendChild(img);
-        }
+        }*/
+		
+		function updateAssinaturaPreview(dataURL) {
+		assinaturaPreview.innerHTML = '';
+		const img = document.createElement('img');
+		img.src = dataURL;
+		img.className = 'max-w-full';
+		
+		// Adicionar borda e fundo para garantir contraste
+		img.style.backgroundColor = '#ffffff';
+		img.style.border = '1px solid #ccc';
+		img.style.padding = '8px';
+		
+		assinaturaPreview.appendChild(img);
+	}
+			
+		
+		
+		
         
         function isCanvasEmpty() {
             const pixelBuffer = new Uint32Array(
