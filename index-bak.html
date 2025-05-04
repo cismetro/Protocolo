@@ -824,7 +824,7 @@
                     try {
                         // Método 1: Usar construtor direto da biblioteca
                         new QRCode(qrContainer, {
-                            text: fullTransferCode, // MUDE AQUI: use código completo para QR code
+                            text: shortTransferCode, // Usar código curto para QR code
                             width: 200,
                             height: 200,
                             colorDark: "#FFFFFF",  // Código branco
@@ -848,7 +848,7 @@
                             qrContainer.appendChild(canvas);
                             
                             // Gerar QR code com o código curto
-                            QRCode.toCanvas(canvas, fullTransferCode, { // MUDE AQUI: use código completo 
+                            QRCode.toCanvas(canvas, shortTransferCode, { 
                                 width: 200, 
                                 margin: 2,
                                 color: {
@@ -867,7 +867,7 @@
                             // Método 3: Usar URL
                             try {
                                 qrContainer.innerHTML = '';
-                                QRCode.toDataURL(fullTransferCode, { // MUDE AQUI: use código completo
+                                QRCode.toDataURL(shortTransferCode, { 
                                     width: 200,
                                     margin: 2,
                                     color: {
