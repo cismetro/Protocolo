@@ -785,11 +785,11 @@
                 
                 // 2. Criar dois códigos - um completo para o QR code e um curto para exibição/cópia
                 const timestamp = Date.now();
-                const shortTransferCode = `${codigo}|${timestamp}|${encodeURIComponent(assinatura)}`;
+                const fullTransferCode = `${codigo}|${timestamp}|${encodeURIComponent(assinatura)}`;
                 const shortTransferCode = `${codigo}|${timestamp}|${idAssinatura}`;
                 
                 // Armazenar o código completo para referência
-                currentTransferCode = shortTransferCode;
+                currentTransferCode = fullTransferCode;
                 
                 // 3. Limpar o container atual
                 transferQRCode.innerHTML = '';
@@ -996,151 +996,121 @@
         }
         
         // Função importSignature atualizada para processar o código curto
-// Função importSignature corrigida
-function importSignature() {
-    const transferCode = importCodeInput.value.trim();
-    
-    if (!transferCode) {
-        showAlert('Digite o código de transferência.', 'error');
-        return;
-    }
-    
-    try {
-        console.log("Processando código de transferência:", transferCode);
-        
-        // Extrair partes do código
-        const parts = transferCode.split('|');
-        
-        if (parts.length < 2) {
-            showAlert('Código de transferência inválido ou mal formatado.', 'error');
-            return;
-        }
-        
-        const codigo = parts[0];
-        const timestamp = parseInt(parts[1]);
-        
-        // Verificar expiração
-        const currentTime = Date.now();
-        const expirationTime = 5 * 60 * 1000; // 5 minutos
-        
-        if (currentTime - timestamp > expirationTime) {
-            showAlert('Este código de transferência expirou. O código é válido por apenas 5 minutos.', 'error');
-            return;
-        }
-        
-        let assinatura = null;
-        
-        // Verificar se temos a terceira parte
-        if (parts.length >= 3) {
-            const idOuAssinatura = parts[2];
-            console.log("Parte 3 do código:", idOuAssinatura.substring(0, 20) + "...");
+        function importSignature() {
+            const transferCode = importCodeInput.value.trim();
             
-            // ESTRATÉGIA 1: Se for uma assinatura codificada (começa com 'data:' ou tem '%')
-            if (idOuAssinatura.indexOf('%') !== -1 || idOuAssinatura.startsWith('data')) {
-                try {
-                    assinatura = decodeURIComponent(idOuAssinatura);
-                    console.log("Assinatura decodificada do código completo");
-                } catch (e) {
-                    console.error('Erro ao decodificar assinatura:', e);
-                }
-            } 
-            // ESTRATÉGIA 2: Se for um ID curto, tentar buscar do cache
-            else if (idOuAssinatura.length <= 10) {
-                console.log("Detectado ID curto:", idOuAssinatura);
+            if (!transferCode) {
+                showAlert('Digite o código de transferência.', 'error');
+                return;
+            }
+            
+            try {
+                // Extrair partes do código
+                const parts = transferCode.split('|');
                 
-                // Tentar do cache global
-                if (window.assinaturaCache && window.assinaturaCache[idOuAssinatura]) {
-                    assinatura = window.assinaturaCache[idOuAssinatura];
-                    console.log("Assinatura encontrada no cache global");
+                if (parts.length < 2) {
+                    showAlert('Código de transferência inválido ou mal formatado.', 'error');
+                    return;
                 }
-                // Tentar do sessionStorage com o ID
-                else if (sessionStorage.getItem(`signature_${idOuAssinatura}`)) {
-                    assinatura = sessionStorage.getItem(`signature_${idOuAssinatura}`);
-                    console.log("Assinatura encontrada no sessionStorage com ID");
+                
+                const codigo = parts[0];
+                const timestamp = parseInt(parts[1]);
+                
+                // Verificar expiração
+                const currentTime = Date.now();
+                const expirationTime = 5 * 60 * 1000; // 5 minutos
+                
+                if (currentTime - timestamp > expirationTime) {
+                    showAlert('Este código de transferência expirou. O código é válido por apenas 5 minutos.', 'error');
+                    return;
                 }
-            }
-            
-            // ESTRATÉGIA 3: Se ainda não encontrou, tentar buscar usando o código do protocolo
-            if (!assinatura) {
-                // Tentar buscar do sessionStorage com código do protocolo
-                if (sessionStorage.getItem(`signature_${codigo}`)) {
-                    assinatura = sessionStorage.getItem(`signature_${codigo}`);
-                    console.log("Assinatura encontrada no sessionStorage com código");
-                }
-                // Tentar buscar do localStorage
-                else if (localStorage.getItem(`signature_${codigo}`)) {
+                
+                let assinatura;
+                
+                // Verificar se temos a terceira parte (ID curto ou assinatura completa)
+                if (parts.length >= 3) {
+                    const terceiraParte = parts[2];
+                    
+                    // Verificar se é um ID curto (menos de 10 caracteres sem caracteres especiais)
+                    if (terceiraParte.length <= 10 && !terceiraParte.includes('%')) {
+                        console.log("Detectado ID curto:", terceiraParte);
+                        
+                        // Tentar obter do cache global
+                        if (window.assinaturaCache && window.assinaturaCache[terceiraParte]) {
+                            assinatura = window.assinaturaCache[terceiraParte];
+                            console.log("Assinatura encontrada no cache global");
+                        } else {
+                            // Tentar obter do sessionStorage
+                            assinatura = sessionStorage.getItem(`signature_${terceiraParte}`);
+                            
+                            if (!assinatura) {
+                                // Buscar do localStorage como último recurso
+                                assinatura = localStorage.getItem(`signature_${codigo}`);
+                                
+                                if (!assinatura) {
+                                    showAlert('Assinatura não encontrada. Por favor, use o QR code ou tente transferir novamente.', 'error');
+                                    return;
+                                }
+                            }
+                        }
+                    } else {
+                        // É provavelmente uma assinatura codificada completa
+                        try {
+                            assinatura = decodeURIComponent(terceiraParte);
+                            console.log("Assinatura completa decodificada do código");
+                        } catch (e) {
+                            console.error('Erro ao decodificar assinatura:', e);
+                            showAlert('Código de transferência corrompido. Tente novamente.', 'error');
+                            return;
+                        }
+                    }
+                } else {
+                    // Formato antigo - buscar do localStorage
                     assinatura = localStorage.getItem(`signature_${codigo}`);
-                    console.log("Assinatura encontrada no localStorage");
+                    
+                    if (!assinatura) {
+                        showAlert('Assinatura não encontrada. Utilize o código completo de transferência.', 'error');
+                        return;
+                    }
                 }
+                
+                // Verificar protocolo ativo
+                if (!appState.currentProtocol) {
+                    showAlert('Nenhum protocolo ativo. Gere um protocolo primeiro.', 'error');
+                    return;
+                }
+                
+                // Atualizar assinatura no protocolo atual
+                appState.protocolos[appState.currentProtocol].assinatura = assinatura;
+                updateAssinaturaPreview(assinatura);
+                
+                // Armazenar localmente
+                localStorage.setItem(`signature_${appState.currentProtocol}`, assinatura);
+                
+                // Também armazenar no cache global e sessionStorage para facilitar transferências futuras
+                const idCache = gerarIdCurto();
+                window.assinaturaCache[idCache] = assinatura;
+                sessionStorage.setItem(`signature_${idCache}`, assinatura);
+                
+                // Atualizar protocolo no localStorage
+                const storedProtocolo = localStorage.getItem(`protocolo_${appState.currentProtocol}`);
+                if (storedProtocolo) {
+                    const protocolo = JSON.parse(storedProtocolo);
+                    protocolo.assinatura = assinatura;
+                    localStorage.setItem(`protocolo_${appState.currentProtocol}`, JSON.stringify(protocolo));
+                }
+                
+                showAlert('Assinatura importada com sucesso!', 'success');
+                
+                // Fechar modal
+                importModal.classList.remove('show');
+                importCodeInput.value = '';
+                
+            } catch (e) {
+                console.error('Erro ao importar assinatura:', e);
+                showAlert('Erro ao processar o código de transferência. Verifique o formato e tente novamente.', 'error');
             }
-        } 
-        // Se não tem terceira parte, tentar buscar pelo código do protocolo
-        else {
-            if (sessionStorage.getItem(`signature_${codigo}`)) {
-                assinatura = sessionStorage.getItem(`signature_${codigo}`);
-            } else if (localStorage.getItem(`signature_${codigo}`)) {
-                assinatura = localStorage.getItem(`signature_${codigo}`);
-            }
         }
-        
-        // Se não encontrou a assinatura
-        if (!assinatura) {
-            console.error("Assinatura não encontrada para o código:", codigo);
-            showAlert('Assinatura não encontrada. Por favor, use o QR code ou tente transferir novamente.', 'error');
-            return;
-        }
-        
-        // Verificar se é uma assinatura válida (deve começar com 'data:image/')
-        if (!assinatura.startsWith('data:image/')) {
-            console.error("Assinatura encontrada não é válida:", assinatura.substring(0, 20) + "...");
-            showAlert('Assinatura encontrada é inválida. Tente novamente.', 'error');
-            return;
-        }
-        
-        console.log("Assinatura válida encontrada, aplicando ao protocolo atual");
-        
-        // Verificar protocolo ativo
-        if (!appState.currentProtocol) {
-            showAlert('Nenhum protocolo ativo. Gere um protocolo primeiro.', 'error');
-            return;
-        }
-        
-        // Atualizar assinatura no protocolo atual
-        appState.protocolos[appState.currentProtocol].assinatura = assinatura;
-        updateAssinaturaPreview(assinatura);
-        
-        // Armazenar localmente de todas as formas possíveis para garantir recuperação futura
-        localStorage.setItem(`signature_${appState.currentProtocol}`, assinatura);
-        sessionStorage.setItem(`signature_${appState.currentProtocol}`, assinatura);
-        
-        // Também armazenar usando o código original como chave
-        localStorage.setItem(`signature_${codigo}`, assinatura);
-        sessionStorage.setItem(`signature_${codigo}`, assinatura);
-        
-        // Armazenar no cache global para uso na mesma sessão
-        if (!window.assinaturaCache) window.assinaturaCache = {};
-        window.assinaturaCache[codigo] = assinatura;
-        
-        // Atualizar protocolo no localStorage
-        const storedProtocolo = localStorage.getItem(`protocolo_${appState.currentProtocol}`);
-        if (storedProtocolo) {
-            const protocolo = JSON.parse(storedProtocolo);
-            protocolo.assinatura = assinatura;
-            localStorage.setItem(`protocolo_${appState.currentProtocol}`, JSON.stringify(protocolo));
-        }
-        
-        showAlert('Assinatura importada com sucesso!', 'success');
-        
-        // Fechar modal
-        importModal.classList.remove('show');
-        importCodeInput.value = '';
-        
-    } catch (e) {
-        console.error('Erro ao importar assinatura:', e);
-        showAlert('Erro ao processar o código de transferência. Verifique o formato e tente novamente.', 'error');
-    }
-}
-
 
         // Verificar se a URL contém um código de protocolo para assinar
         function checkUrlForProtocolCode() {
@@ -1250,7 +1220,3 @@ function importSignature() {
     </script>
 </body>
 </html>
-
-<!--
-teste
--->
